@@ -161,3 +161,36 @@ exports.updateSpaces = async (req, res) => {
     res.status(500).json({ error: "Server error updating spaces" });
   }
 };
+// Get 20-minute check-in stats for today
+exports.getTimeBasedStats = async (req, res) => {
+  const parkerId = req.user.id;
+
+  try {
+    const [rows] = await db.execute(
+      `SELECT 
+         HOUR(entry_time) AS hour,
+         FLOOR(MINUTE(entry_time) / 20) AS segment,
+         COUNT(*) AS count
+       FROM parking_records
+       WHERE parker_id = ? AND DATE(entry_time) = CURDATE()
+       GROUP BY hour, segment
+       ORDER BY hour, segment`,
+      [parkerId]
+    );
+
+    const formatted = rows.map((r) => {
+      const hour = r.hour.toString().padStart(2, '0');
+      const minute = (r.segment * 20).toString().padStart(2, '0');
+      return {
+        label: `${hour}:${minute}`,
+        count: r.count,
+      };
+    });
+
+    res.json(formatted);
+  } catch (err) {
+    console.error("❌ Failed to fetch time stats:", err.message);
+    res.status(500).json({ error: "Failed to fetch time-based stats" });
+  }
+};
+
