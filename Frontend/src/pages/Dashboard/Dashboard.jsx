@@ -2,6 +2,27 @@ import React, { useEffect, useState } from "react";
 import api from "../../api/axios";
 import CountUp from "react-countup";
 import { motion } from "framer-motion";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -15,6 +36,7 @@ const Dashboard = () => {
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [newSpaces, setNewSpaces] = useState("");
+  const [timeStats, setTimeStats] = useState([]);
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 5000);
@@ -23,6 +45,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
+    fetchTimeStats();
   }, []);
 
   const fetchStats = async () => {
@@ -31,6 +54,15 @@ const Dashboard = () => {
       setStats(res.data);
     } catch (err) {
       console.error("Failed to load dashboard:", err.response?.data?.error);
+    }
+  };
+
+  const fetchTimeStats = async () => {
+    try {
+      const res = await api.get("/parking/time-checkins");
+      setTimeStats(res.data);
+    } catch (err) {
+      console.error("Failed to load time stats:", err.response?.data?.error);
     }
   };
 
@@ -46,7 +78,7 @@ const Dashboard = () => {
         available_spaces: parseInt(newSpaces),
       });
       alert("Updated available spaces!");
-      fetchStats(); // reload dashboard stats
+      fetchStats();
       setNewSpaces("");
     } catch (err) {
       alert("Failed to update: " + err.response?.data?.error);
@@ -87,6 +119,7 @@ const Dashboard = () => {
         </div>
       </form>
 
+      {/* 🔢 Summary Cards */}
       <div className="row mb-4">
         {[
           { label: "Open Spaces", value: stats.openSpaces, bg: "bg-success" },
@@ -110,6 +143,45 @@ const Dashboard = () => {
         ))}
       </div>
 
+      (/* 📊 20-Minute Interval Chart */)
+      {timeStats.length > 0 && (
+        <div className="mb-5">
+          <h4>Check-In Trend (Every 20 Minutes)</h4>
+          <Line
+            data={{
+              labels: timeStats.map((d) => d.label),
+              datasets: [
+                {
+                  label: "Check-Ins",
+                  data: timeStats.map((d) => d.count),
+                  borderColor: "#007bff",
+                  backgroundColor: "#007bff33",
+                  fill: true,
+                },
+              ],
+            }}
+            options={{
+              responsive: true,
+              plugins: {
+                legend: { display: true },
+              },
+              scales: {
+                x: {
+                  title: { display: true, text: "Time of Day" },
+                  ticks: { maxRotation: 0 },
+                },
+                y: {
+                  title: { display: true, text: "Check-ins" },
+                  beginAtZero: true,
+                  ticks: {
+                    precision: 0, // Ensure no decimal values
+                  },
+                },
+              },
+            }}
+          />
+        </div>
+      )}
       <h4>Currently Parked Cars</h4>
       <table className="table table-bordered">
         <thead>
